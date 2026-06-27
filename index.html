@@ -362,27 +362,11 @@ const FB_URL = 'https://wagaya-32f81-default-rtdb.firebaseio.com/wagaya/data.jso
 const LS_UID = 'wagaya_uid';
 
 async function fbGet() {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 8000);
-  try {
-    const r = await fetch(FB_URL, {signal: controller.signal});
-    clearTimeout(timer);
-    return r.json();
-  } catch(e) {
-    clearTimeout(timer);
-    throw e;
-  }
+  const r = await fetch(FB_URL);
+  return r.json();
 }
 async function fbSet(data) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 8000);
-  try {
-    await fetch(FB_URL, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data), signal: controller.signal});
-    clearTimeout(timer);
-  } catch(e) {
-    clearTimeout(timer);
-    throw e;
-  }
+  await fetch(FB_URL, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
 }
 
 // ===== デフォルト状態 =====
@@ -405,8 +389,6 @@ let ct = 'expense', ft = 'expense', sc = null, fsc = null, sv = 'donut', at = 'l
 
 // ===== データ保存・読込 =====
 async function loadData() {
-  var sub = document.getElementById('loadSub');
-  if(sub) sub.textContent = 'データを取得中…';
   try {
     const d = await fbGet();
     if (d) {
@@ -421,8 +403,6 @@ async function loadData() {
     }
   } catch(e) {
     console.error('load error', e);
-    // タイムアウト時はデフォルト状態で起動
-    if(document.getElementById('loadSub')) document.getElementById('loadSub').textContent = 'オフラインで起動します…';
   }
 }
 async function saveData() {
@@ -440,7 +420,10 @@ async function syncData() {
       if (!S.dayMemos) S.dayMemos = {};
       if (!S.members) S.members = DS.members;
       if (!S.appTitle) S.appTitle = DS.appTitle;
-      if (at==='ledger') rL(); if (at==='summary') rS(); if (at==='calendar') rC(); if (at==='todo') rT();
+      if (at==='ledger') rL();
+      if (at==='summary') rS();
+      if (at==='calendar') rC();
+      if (at==='todo') rT();
       uh(); si('🔄 同期しました');
     }
   } catch(e) {}
@@ -676,15 +659,11 @@ document.querySelectorAll('.ov').forEach(el=>{el.addEventListener('click',e=>{if
 
 // ===== 初期化 =====
 async function init(){
-  try {
-    await loadData();
-  } catch(e) {
-    console.error('init load error', e);
-  }
+  await loadData();
   vm = S.currentMonth || new Date().toISOString().slice(0,7);
   cm = vm;
-  try { applyFix(); } catch(e) {}
-  try { applyBG(); } catch(e) {}
+  applyFix();
+  applyBG();
   document.getElementById('scLoad').classList.add('hide');
   if(!uid||!(S.members||[]).find(function(m){return m.id===uid;})){
     showScUser();
