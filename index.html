@@ -643,20 +643,21 @@ document.querySelectorAll('.ov').forEach(el=>{el.addEventListener('click',e=>{if
 
 // ===== 初期化 =====
 function startApp() {
-  vm = S.currentMonth || new Date().toISOString().slice(0,7);
-  cm = vm;
-  applyFix();
-  applyBG();
-  document.getElementById('scLoad').classList.add('hide');
-  if(!uid||!(S.members||[]).find(function(m){return m.id===uid;})){
-    showScUser();
-  } else {
-    uh(); rL(); uTB();
-  }
+  try { vm = S.currentMonth || new Date().toISOString().slice(0,7); } catch(e){}
+  try { cm = vm; } catch(e){}
+  try { applyBG(); } catch(e){ console.error('applyBG error',e); }
+  var el = document.getElementById('scLoad');
+  if(el) el.style.display = 'none';
+  try {
+    if(!uid||!(S.members||[]).find(function(m){return m.id===uid;})){
+      showScUser();
+    } else {
+      uh(); rL(); uTB();
+    }
+  } catch(e){ console.error('startApp error',e); }
 }
 
 async function init(){
-  // まずデフォルト状態でアプリを起動
   startApp();
   // バックグラウンドでFirebaseからデータを取得
   try {
