@@ -194,7 +194,7 @@ body::after{content:"";position:fixed;inset:0;background:var(--bgo,rgba(245,240,
 <div class="fs-screen" id="scLoad">
   <div class="fs-icon">📒</div>
   <div class="fs-title" id="loadTit">わが家の通帳</div>
-  <div class="fs-sub">読み込み中…</div>
+  <div class="fs-sub" id="loadSub">Firebaseに接続中…</div>
   <div style="width:36px;height:36px;border:3px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 0.8s linear infinite"></div>
 </div>
 
@@ -362,11 +362,27 @@ const FB_URL = 'https://wagaya-32f81-default-rtdb.firebaseio.com/wagaya/data.jso
 const LS_UID = 'wagaya_uid';
 
 async function fbGet() {
-  const r = await fetch(FB_URL);
-  return r.json();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    const r = await fetch(FB_URL, {signal: controller.signal});
+    clearTimeout(timer);
+    return r.json();
+  } catch(e) {
+    clearTimeout(timer);
+    throw e;
+  }
 }
 async function fbSet(data) {
-  await fetch(FB_URL, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    await fetch(FB_URL, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data), signal: controller.signal});
+    clearTimeout(timer);
+  } catch(e) {
+    clearTimeout(timer);
+    throw e;
+  }
 }
 
 // ===== デフォルト状態 =====
@@ -389,6 +405,8 @@ let ct = 'expense', ft = 'expense', sc = null, fsc = null, sv = 'donut', at = 'l
 
 // ===== データ保存・読込 =====
 async function loadData() {
+  var sub = document.getElementById('loadSub');
+  if(sub) sub.textContent = 'データを取得中…';
   try {
     const d = await fbGet();
     if (d) {
@@ -401,7 +419,11 @@ async function loadData() {
       if (!S.categories.expense) S.categories.expense = DS.categories.expense;
       if (!S.categories.income) S.categories.income = DS.categories.income;
     }
-  } catch(e) { console.error('load error', e); }
+  } catch(e) {
+    console.error('load error', e);
+    // タイムアウト時はデフォルト状態で起動
+    if(document.getElementById('loadSub')) document.getElementById('loadSub').textContent = 'オフラインで起動します…';
+  }
 }
 async function saveData() {
   try {
@@ -654,13 +676,17 @@ document.querySelectorAll('.ov').forEach(el=>{el.addEventListener('click',e=>{if
 
 // ===== 初期化 =====
 async function init(){
-  // scLoad is visible by default
-  await loadData();
+  try {
+    await loadData();
+  } catch(e) {
+    console.error('init load error', e);
+  }
   vm = S.currentMonth || new Date().toISOString().slice(0,7);
   cm = vm;
-  applyFix(); applyBG();
+  try { applyFix(); } catch(e) {}
+  try { applyBG(); } catch(e) {}
   document.getElementById('scLoad').classList.add('hide');
-  if(!uid||!(S.members||[]).find(m=>m.id===uid)){
+  if(!uid||!(S.members||[]).find(function(m){return m.id===uid;})){
     showScUser();
   } else {
     uh(); rL(); uTB();
