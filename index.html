@@ -194,7 +194,7 @@ body::after{content:"";position:fixed;inset:0;background:var(--bgo,rgba(245,240,
 <div class="fs-screen" id="scLoad">
   <div class="fs-icon">📒</div>
   <div class="fs-title" id="loadTit">わが家の通帳</div>
-  <div class="fs-sub" id="loadSub">Firebaseに接続中…</div>
+  <div class="fs-sub" id="loadSub">起動中…</div>
   <div style="width:36px;height:36px;border:3px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 0.8s linear infinite"></div>
 </div>
 
@@ -388,23 +388,7 @@ let vm = S.currentMonth, cm = vm, scd = null;
 let ct = 'expense', ft = 'expense', sc = null, fsc = null, sv = 'donut', at = 'ledger';
 
 // ===== データ保存・読込 =====
-async function loadData() {
-  try {
-    const d = await fbGet();
-    if (d) {
-      S = Object.assign({}, DS, d);
-      if (!S.todoLists) S.todoLists = DS.todoLists;
-      if (!S.dayMemos) S.dayMemos = {};
-      if (!S.members) S.members = DS.members;
-      if (!S.appTitle) S.appTitle = DS.appTitle;
-      if (!S.categories) S.categories = DS.categories;
-      if (!S.categories.expense) S.categories.expense = DS.categories.expense;
-      if (!S.categories.income) S.categories.income = DS.categories.income;
-    }
-  } catch(e) {
-    console.error('load error', e);
-  }
-}
+// loadData is now inlined in init()
 async function saveData() {
   try {
     await fbSet(S);
@@ -658,8 +642,7 @@ function closeM(id){document.getElementById(id).classList.remove('open');documen
 document.querySelectorAll('.ov').forEach(el=>{el.addEventListener('click',e=>{if(e.target===el)closeM(el.id);});});
 
 // ===== 初期化 =====
-async function init(){
-  await loadData();
+function startApp() {
   vm = S.currentMonth || new Date().toISOString().slice(0,7);
   cm = vm;
   applyFix();
@@ -669,6 +652,36 @@ async function init(){
     showScUser();
   } else {
     uh(); rL(); uTB();
+  }
+}
+
+async function init(){
+  // まずデフォルト状態でアプリを起動
+  startApp();
+  // バックグラウンドでFirebaseからデータを取得
+  try {
+    const d = await fbGet();
+    if (d) {
+      S = Object.assign({}, DS, d);
+      if (!S.todoLists) S.todoLists = DS.todoLists;
+      if (!S.dayMemos) S.dayMemos = {};
+      if (!S.members) S.members = DS.members;
+      if (!S.appTitle) S.appTitle = DS.appTitle;
+      if (!S.categories) S.categories = DS.categories;
+      if (!S.categories.expense) S.categories.expense = DS.categories.expense;
+      if (!S.categories.income) S.categories.income = DS.categories.income;
+      vm = S.currentMonth || vm;
+      cm = vm;
+      applyBG();
+      if(!uid||!(S.members||[]).find(function(m){return m.id===uid;})){
+        showScUser();
+      } else {
+        uh(); rL(); uTB();
+      }
+    }
+  } catch(e) {
+    console.error('Firebase load error:', e);
+    si('⚠️ オフラインで動作中');
   }
 }
 init();
