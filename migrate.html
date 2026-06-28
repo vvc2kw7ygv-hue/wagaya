@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>データ移行ツール</title>
+<style>
+body{font-family:"Hiragino Sans",sans-serif;background:#1a2a4a;color:white;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:20px;gap:16px;}
+.card{background:rgba(255,255,255,0.1);border-radius:16px;padding:20px;width:100%;max-width:360px;}
+h1{font-size:18px;font-weight:700;text-align:center;}
+.status{font-size:14px;opacity:0.8;text-align:center;min-height:40px;line-height:1.6;}
+.btn{width:100%;padding:14px;background:#e8734a;color:white;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;}
+.btn:disabled{opacity:0.5;cursor:not-allowed;}
+.log{background:rgba(0,0,0,0.3);border-radius:10px;padding:12px;font-size:12px;max-height:200px;overflow-y:auto;line-height:1.8;}
+.ok{color:#7ecf88;} .err{color:#f08a7a;}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>📊 過去データ移行ツール</h1>
+  <div class="status" id="status">ボタンを押すとFirebaseにデータを書き込みます</div>
+  <button class="btn" id="btn" onclick="run()">データを移行する</button>
+</div>
+<div class="card">
+  <div class="log" id="log">ここにログが表示されます</div>
+</div>
+
+<script>
+const FB_BASE = 'https://wagaya-32f81-default-rtdb.firebaseio.com/wagaya/data.json';
+
+// 新しいカテゴリ
+const newCategories = {
+  expense: [
+    {id:'food',icon:'🍱',name:'食費'},
+    {id:'daily',icon:'🧴',name:'日用品'},
+    {id:'util',icon:'💡',name:'光熱費'},
+    {id:'med',icon:'💊',name:'医療'},
+    {id:'tr',icon:'🚃',name:'交通費'},
+    {id:'ent',icon:'🎭',name:'娯楽'},
+    {id:'cl',icon:'👕',name:'衣類'},
+    {id:'oe',icon:'📦',name:'その他'},
+    {id:'eating_out',icon:'🍽️',name:'外食費'},
+    {id:'cooking',icon:'🍚',name:'自炊費'},
+    {id:'muscle',icon:'💪',name:'筋肉費'},
+    {id:'housing',icon:'🏠',name:'住居費'},
+    {id:'daily2',icon:'📦',name:'日用雑貨費'},
+    {id:'water',icon:'💧',name:'水道光熱費'},
+    {id:'car',icon:'🚗',name:'車両費'},
+    {id:'leisure',icon:'🎸',name:'趣味・レジャー費'},
+  ],
+  income: [
+    {id:'sal',icon:'💼',name:'給与'},
+    {id:'sid',icon:'💻',name:'副収入'},
+    {id:'oi',icon:'🎁',name:'その他収入'}
+  ]
+};
+
+// 過去データ（各月の1日付けで登録）
+const records = [
+  // 2026年4月
+  {id:'imp_apr_1', date:'2026-04-01', type:'expense', catId:'eating_out', amount:45465, memo:'2026年4月（移行データ）'},
+  {id:'imp_apr_2', date:'2026-04-01', type:'expense', catId:'cooking',    amount:39629, memo:'2026年4月（移行データ）'},
+  {id:'imp_apr_3', date:'2026-04-01', type:'expense', catId:'muscle',     amount:34960, memo:'2026年4月（移行データ）'},
+  {id:'imp_apr_4', date:'2026-04-01', type:'expense', catId:'housing',    amount:12200, memo:'2026年4月（移行データ）'},
+  {id:'imp_apr_5', date:'2026-04-01', type:'expense', catId:'daily2',     amount:6763,  memo:'2026年4月（移行データ）'},
+  {id:'imp_apr_6', date:'2026-04-01', type:'expense', catId:'leisure',    amount:3295,  memo:'2026年4月（移行データ）'},
+  // 2026年5月
+  {id:'imp_may_1', date:'2026-05-01', type:'expense', catId:'housing',    amount:128035, memo:'2026年5月（移行データ）'},
+  {id:'imp_may_2', date:'2026-05-01', type:'expense', catId:'cooking',    amount:68411,  memo:'2026年5月（移行データ）'},
+  {id:'imp_may_3', date:'2026-05-01', type:'expense', catId:'leisure',    amount:32474,  memo:'2026年5月（移行データ）'},
+  {id:'imp_may_4', date:'2026-05-01', type:'expense', catId:'eating_out', amount:24928,  memo:'2026年5月（移行データ）'},
+  {id:'imp_may_5', date:'2026-05-01', type:'expense', catId:'daily2',     amount:15983,  memo:'2026年5月（移行データ）'},
+  {id:'imp_may_6', date:'2026-05-01', type:'expense', catId:'water',      amount:13420,  memo:'2026年5月（移行データ）'},
+  {id:'imp_may_7', date:'2026-05-01', type:'expense', catId:'car',        amount:4343,   memo:'2026年5月（移行データ）'},
+  // 2026年6月
+  {id:'imp_jun_1', date:'2026-06-01', type:'expense', catId:'cooking',    amount:76287, memo:'2026年6月（移行データ）'},
+  {id:'imp_jun_2', date:'2026-06-01', type:'expense', catId:'eating_out', amount:35709, memo:'2026年6月（移行データ）'},
+  {id:'imp_jun_3', date:'2026-06-01', type:'expense', catId:'daily2',     amount:9972,  memo:'2026年6月（移行データ）'},
+  {id:'imp_jun_4', date:'2026-06-01', type:'expense', catId:'leisure',    amount:6404,  memo:'2026年6月（移行データ）'},
+  {id:'imp_jun_5', date:'2026-06-01', type:'expense', catId:'housing',    amount:1200,  memo:'2026年6月（移行データ）'},
+];
+
+function log(msg, type) {
+  var el = document.getElementById('log');
+  var cls = type==='ok'?'ok':type==='err'?'err':'';
+  el.innerHTML += '<span class="'+cls+'">'+msg+'</span><br>';
+  el.scrollTop = el.scrollHeight;
+}
+
+async function run() {
+  var btn = document.getElementById('btn');
+  var status = document.getElementById('status');
+  btn.disabled = true;
+  status.textContent = 'Firebaseからデータを取得中…';
+  log('開始します');
+
+  try {
+    // 既存データを取得
+    var r = await fetch(FB_BASE);
+    var existing = await r.json();
+    log('既存データ取得 OK', 'ok');
+
+    if (!existing) existing = {};
+
+    // カテゴリを更新
+    existing.categories = newCategories;
+    log('カテゴリを更新（新カテゴリ追加）', 'ok');
+
+    // 既存recordsを保持しつつ移行データを追加
+    if (!existing.records) existing.records = [];
+    // 重複チェック
+    var existingIds = existing.records.map(function(r){return r.id;});
+    var added = 0;
+    records.forEach(function(rec) {
+      if (existingIds.indexOf(rec.id) === -1) {
+        existing.records.push(rec);
+        added++;
+        log('追加: ' + rec.date + ' ' + rec.catId + ' ' + rec.amount + '円', 'ok');
+      } else {
+        log('スキップ（重複）: ' + rec.id);
+      }
+    });
+
+    // Firebaseに書き込み
+    status.textContent = 'Firebaseに書き込み中…';
+    await fetch(FB_BASE, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(existing)
+    });
+
+    log('');
+    log('完了！ ' + added + '件追加しました', 'ok');
+    status.textContent = '✅ 移行完了！アプリを開いて確認してください。';
+    btn.textContent = '完了';
+
+  } catch(e) {
+    log('エラー: ' + e.message, 'err');
+    status.textContent = 'エラーが発生しました。もう一度お試しください。';
+    btn.disabled = false;
+  }
+}
+</script>
+</body>
+</html>
