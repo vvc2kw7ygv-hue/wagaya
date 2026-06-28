@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>テスト</title>
+</head>
+<body>
+<div id="msg" style="font-size:24px;text-align:center;padding:40px;font-family:sans-serif">
+読み込み中...
+</div>
+<script>
+document.getElementById('msg').textContent = 'JavaScript動作OK！';
+
+async function test() {
+  try {
+    var r = await fetch('https://wagaya-32f81-default-rtdb.firebaseio.com/wagaya/data.json');
+    var d = await r.json();
+    document.getElementById('msg').textContent = 'Firebase接続OK！データ件数: ' + (d && d.records ? d.records.length : 0) + '件';
+  } catch(e) {
+    document.getElementById('msg').textContent = 'Firebaseエラー: ' + e.message;
+  }
+}
+test();
+</script>
+</body>
+</html>
